@@ -1,5 +1,26 @@
+function validISODate(value, label) {
+  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) {
+    throw new RangeError(label + ' : date ISO AAAA-MM-JJ obligatoire');
+  }
+  const parsed = new Date(value + 'T00:00:00.000Z');
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new RangeError(label + ' : date calendrier invalide');
+  }
+}
+function validFiniteNumber(value, label, {integer=false, strictlyPositive=false}={}) {
+  if ((typeof value === 'string' && !value.trim()) || value === null || value === undefined ||
+      !Number.isFinite(Number(value)) || Number(value) < 0 ||
+      (integer && !Number.isInteger(Number(value))) ||
+      (strictlyPositive && Number(value) === 0)) {
+    throw new RangeError(label + ' : valeur numérique invalide');
+  }
+  return Number(value);
+}
 /** ONEE Pension — portage expérimental des formules documentées, sans modernisation. */
 export function days360US(start, end) {
+  validISODate(start, 'Date affiliation');
+  validISODate(end, 'Date cessation');
+  if (end < start) throw new RangeError('La cessation doit suivre l’affiliation');
   const [y1,m1,d1raw]=start.split('-').map(Number), [y2,m2,d2raw]=end.split('-').map(Number);
   const lastFeb=(y,m,d)=>m===2&&d===new Date(y,2,0).getDate();
   let d1=d1raw,d2=d2raw;
@@ -28,6 +49,17 @@ export function calculerCCR(entree, grille) {
   // Les catégories concernées restent à valider dans Excel avant publication.
   const lignes=grille.lignes.filter(r=>r[0]===+categorie&&r[1]===+niveau&&r[2]===+degre);
   if(lignes.length!==1)throw new Error('Clé de classement absente ou ambiguë');
+  // Validate calculator inputs without changing historical spreadsheet formulas.
+  for (const [label,value] of [['Catégorie',categorie],['Niveau',niveau],['Degré',degre]]) {
+    validFiniteNumber(value,label,{integer:true,strictlyPositive:true});
+  }
+  const requiredCounts=[['Enfants +16',enfantsPlus16],['Enfants -21',enfantsMoins21],
+    ['Enfants scolarisés',enfantsScolarises],['Veuves',veuves],['Personnes à charge',personnesCharge]];
+  for (const [label,value] of requiredCounts) validFiniteNumber(value,label,{integer:true});
+  const requiredAmounts=[['Charges fiscales',autresChargesFiscales],['CFC',retenueCFC],
+    ['ASGD',retenueASGD],['Dons/legs',donsLegs],['Avantage nature',avantageNature]];
+  for (const [label,value] of requiredAmounts) validFiniteNumber(value,label);
+  validFiniteNumber(lignes[0][3],'Salaire brut mensuel',{strictlyPositive:true});
   const rgbMensuel=lignes[0][3], rgbTrimestriel=rgbMensuel*3;
   const jours360=days360US(dateAffiliation,dateCessation);
   const coeffBrut=jours360*0.025/360+0.0002;
