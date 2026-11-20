@@ -1,7 +1,7 @@
 name: ONEE Pension calculation regression gates
 'on':
   push:
-    branches: ["qa/toolkit-2026-11-20"]
+    branches: ["qa/toolkit-2026-11-20", "feature/phase2-input-guards"]
   pull_request:
   workflow_dispatch:
 permissions:
